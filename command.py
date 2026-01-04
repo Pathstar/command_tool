@@ -86,7 +86,7 @@ class ParseResult:
         node = self.node
         if node.executor:
             try:
-                node.executor(*self.args)
+                node.executor(self.args)
             except Exception as e:
                 print(e)
                 print(node.__dict__)
@@ -149,6 +149,7 @@ def build(parent, node_spec, command=""):
 def build_registry(root, registry: dict):
     for cmd_name, spec in registry.items():
         build(root, spec)
+
 
 
 
