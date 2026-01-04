@@ -31,8 +31,9 @@ class IntArg(ArgumentType):
 
 
 
-def tp_executor(player, target="", x=None, y=None):
-    print(f"✅ TP 执行：{player} → {target} @ ({x}, {y})")
+def tp_executor(args):
+    # player, target="", x=None, y=None
+    print(f"✅ TP 执行：{args[0]} → {args[1]} @ ({args[2]}, {args[3]})")
 
 # 用 dict 描述命令树
 command_registry_dict = {
@@ -117,6 +118,7 @@ if __name__ == "__main__":
             result = parse_command(root, tokens)
             print("预览:", result.suggest())
             result.execute()
+
 
 
     demo()
