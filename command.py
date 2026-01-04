@@ -1,12 +1,10 @@
-
 from typing import Callable
 
+NAME = "name"
+ARG = "arg"
 LITERAL = "literal"
 ARGUMENT = "argument"
-# ==================================================
-# Argument Types
-# ==================================================
-
+EXECUTOR = "executor"
 
 class ArgumentType:
     def parse(self, token: str):
@@ -15,10 +13,6 @@ class ArgumentType:
     def suggestions(self) -> list[str]:
         return []
 
-
-# ==================================================
-# Command Node (核心结构)
-# ==================================================
 
 class CommandNode:
     def __init__(self, name: str, arg_type: ArgumentType = None):
@@ -94,7 +88,7 @@ class ParseResult:
             print("⚠️ 命令未完成，缺少参数")
 
 # ==================================================
-# Parser (唯一遍历命令树的地方)
+# Parser (遍历命令树，解析列表命令)
 # ==================================================
 
 def parse_command(root: CommandNode, tokens: list[str]) -> ParseResult:
@@ -127,20 +121,23 @@ def parse_command(root: CommandNode, tokens: list[str]) -> ParseResult:
 
 
 def build(parent, node_spec, command=""):
-    node_name = node_spec["name"]
+    node_name = node_spec[NAME]
     command += f" {node_name}"
-    if node_spec["type"] == "literal":
+    if node_spec["type"] == LITERAL:
         node = CommandNode(node_name)
         cur = parent.add_literal(node)
     else:
-        arg = node_spec.get("arg", None)
+        arg = node_spec.get(ARG, None)
         if arg is None:
-            print(f"Waring: {command} 无 argument No parse class")
-        node = CommandNode(node_name, arg)
+            print(f"Waring: argument {command} has no parse method")
+            node = CommandNode(node_name)
+        else:
+            node = CommandNode(node_name, arg)
         cur = parent.add_argument(node)
 
-    if "executor" in node_spec:
-        node.executor = node_spec["executor"]
+    executor_func = node_spec.get(EXECUTOR, None)
+    if executor_func:
+        node.executor = executor_func
 
     for child in node_spec.get("children", []):
         build(cur, child, command)
@@ -149,6 +146,7 @@ def build(parent, node_spec, command=""):
 def build_registry(root, registry: dict):
     for cmd_name, spec in registry.items():
         build(root, spec)
+
 
 
 
