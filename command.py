@@ -161,11 +161,32 @@ class CommandNode:
 # Parser (遍历命令树，解析列表命令)
 # ==================================================
 
-def parse_command(root: CommandNode, tokens: list[str]) -> ParseResult:
+def next_token(s: str, sep: str):
+    """
+    从 s 中取出下一个 token 和 rest（剩余字符串）。
+    - 自动跳过开头连续分隔符
+    - sep 为单个分隔符字符串（如 " "、","、"|" 等）
+    """
+    if not sep:
+        raise ValueError("sep 不能为空")
+    s = s.lstrip(sep)
+    if not s:
+        return None, ""
+    idx = s.find(sep)
+    if idx == -1:
+        return s, ""
+    return s[:idx], s[idx + len(sep):]
+
+
+def parse_command(root: CommandNode, tokens: str) -> ParseResult:
     node = root
     args = []
 
-    for i, token in enumerate(tokens):
+    rest = tokens
+    while True:
+        token, rest = _next_token(rest, sep)
+        if token is None:  # 没有更多 token
+            break
         # 1️⃣ literal 优先（O(1)）
         if token in node.literal_children:
             node = node.literal_children[token]
@@ -196,6 +217,41 @@ def parse_command(root: CommandNode, tokens: list[str]) -> ParseResult:
 
     return ParseResult(node, args)
 
+
+def parse_command(root: "CommandNode", tokens: str, sep: str = " ") -> ParseResult:
+    node = root
+    args: List[Any] = []
+    rest = tokens
+    while True:
+        token, rest = _next_token(rest, sep)
+        if token is None:  # 没有更多 token
+            break
+        # 1️⃣ literal 优先（O(1)）
+        if token in node.literal_children:
+            node = node.literal_children[token]
+            if node.consume_rest:
+                # consume_rest：把剩余部分（不再按 token 解析）作为一个参数加入
+                args.append(rest)
+                break
+            continue
+        # 2️⃣ argument 顺序匹配
+        matched = False
+        for arg_node in node.argument_children:
+            try:
+                value = arg_node.arg_type.parse(token)
+                args.append(value)
+                node = arg_node
+                matched = True
+                if node.consume_rest:
+                    args.append(rest)
+                break
+            except ValueError:
+                continue
+        if not matched:
+            return ParseResult(node, args, error=f"无法解析参数: {token}")
+        if node.consume_rest:
+            break
+    return ParseResult(node, args)
 
 def build(parent, node_spec, command: list[str]=None):
     node_name = node_spec[NAME]
