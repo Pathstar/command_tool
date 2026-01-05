@@ -1,4 +1,3 @@
-
 # const
 NAME = "name"
 ALIASES = "aliases"
@@ -14,6 +13,7 @@ class ArgumentType:
 
     def suggestions(self) -> list[str]:
         return []
+
 
 # ==================================================
 # Parse Result
@@ -33,7 +33,7 @@ class ParseResult:
     # Suggestion
     # ==================================================
 
-    def suggest(self, suggestions: list[str]=None) -> list[str]:
+    def suggest(self, suggestions: list[str] = None) -> list[str]:
         if self.error:
             return []
 
@@ -50,7 +50,6 @@ class ParseResult:
             suggestions.extend(arg_node.arg_type.suggestions() or [f"<{arg_node.name}>"])
 
         return suggestions
-
 
     # ==================================================
     # Executor
@@ -104,9 +103,8 @@ class CommandNode:
         self.argument_children.append(node)
         return node
 
-
-    def parse_command(self, tokens: list[str]) -> ParseResult:
-        return parse_command(self, tokens)
+    def parse_command(self, command_str: str) -> ParseResult:
+        return parse_command(self, command_str)
 
     def remove_literal(self, node) -> int:
         to_del = [k for k, v in self.literal_children.items() if v is node]
@@ -157,11 +155,12 @@ class CommandNode:
                 node = child_node
         return node
 
+
 # ==================================================
 # Parser (遍历命令树，解析列表命令)
 # ==================================================
 
-def next_token(s: str, sep: str):
+def next_token(s: str, sep: str = " "):
     """
     从 s 中取出下一个 token 和 rest（剩余字符串）。
     - 自动跳过开头连续分隔符
@@ -178,62 +177,23 @@ def next_token(s: str, sep: str):
     return s[:idx], s[idx + len(sep):]
 
 
-def parse_command(root: CommandNode, tokens: str) -> ParseResult:
+def parse_command(root: CommandNode, command_str: str, sep: str = " ") -> ParseResult:
     node = root
     args = []
 
-    rest = tokens
+    rest = command_str
     while True:
-        token, rest = _next_token(rest, sep)
+        token, rest = next_token(rest, sep)
         if token is None:  # 没有更多 token
             break
         # 1️⃣ literal 优先（O(1)）
         if token in node.literal_children:
             node = node.literal_children[token]
             if node.consume_rest:
-                args.append(tokens[i+1:])
-                break
-            continue
-
-        # 2️⃣ argument 顺序匹配
-        matched = False
-        for arg_node in node.argument_children:
-            try:
-                value = arg_node.arg_type.parse(token)
-                args.append(value)
-                node = arg_node
-                matched = True
-                if node.consume_rest:
-                    args.append(tokens[i+1:])
-                break
-            except ValueError:
-                continue
-
-        if not matched:
-            return ParseResult(node, args, error=f"无法解析参数: {token}")
-
-        if node.consume_rest:
-            break
-
-    return ParseResult(node, args)
-
-
-def parse_command(root: "CommandNode", tokens: str, sep: str = " ") -> ParseResult:
-    node = root
-    args: List[Any] = []
-    rest = tokens
-    while True:
-        token, rest = _next_token(rest, sep)
-        if token is None:  # 没有更多 token
-            break
-        # 1️⃣ literal 优先（O(1)）
-        if token in node.literal_children:
-            node = node.literal_children[token]
-            if node.consume_rest:
-                # consume_rest：把剩余部分（不再按 token 解析）作为一个参数加入
                 args.append(rest)
                 break
             continue
+
         # 2️⃣ argument 顺序匹配
         matched = False
         for arg_node in node.argument_children:
@@ -247,13 +207,17 @@ def parse_command(root: "CommandNode", tokens: str, sep: str = " ") -> ParseResu
                 break
             except ValueError:
                 continue
+
         if not matched:
             return ParseResult(node, args, error=f"无法解析参数: {token}")
+
         if node.consume_rest:
             break
+
     return ParseResult(node, args)
 
-def build(parent, node_spec, command: list[str]=None):
+
+def build(parent, node_spec, command: list[str] = None):
     node_name = node_spec[NAME]
 
     if ARG in node_spec:
@@ -297,4 +261,3 @@ def build(parent, node_spec, command: list[str]=None):
 def build_registry(root, registry: dict):
     for cmd_name, spec in registry.items():
         build(root, spec)
-

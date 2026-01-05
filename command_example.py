@@ -1,8 +1,9 @@
-from command import CommandNode, ArgumentType, build_registry, parse_command
+from command import CommandNode, ArgumentType, build_registry
 
 # Minecraft tp 示例 （只是演示，并非按照原tp命令实现）
 
 root = CommandNode("root")
+
 
 class PlayerArg(ArgumentType):
     def parse(self, token: str):
@@ -14,7 +15,6 @@ class PlayerArg(ArgumentType):
         return ["@p", "@a", "Steve", "Alex"]
 
 
-
 class IntArg(ArgumentType):
     def parse(self, token: str):
         # 字符串正负数数字化数字
@@ -23,13 +23,10 @@ class IntArg(ArgumentType):
         raise ValueError("不是整数")
 
 
-
-
 # ==================================================
 # Build Command Tree example 1
 # ==================================================
 # /tp <player> <target> <x> <y>
-
 
 
 def tp_executor(tokens, player):
@@ -37,6 +34,7 @@ def tp_executor(tokens, player):
     # print(f"✅ TP 执行：{tokens[0]} → {} @ ({}, {})")
     print(f"✅ TP 执行 {tokens}, {player.__dict__}")
     # raise Exception("模拟 TP 执行报错")
+
 
 # 用 dict 描述命令树
 command_registry_dict = {
@@ -79,9 +77,6 @@ command_registry_dict = {
 
 build_registry(root, command_registry_dict)
 
-
-
-
 # ==================================================
 # Build Command Tree example 2
 # ==================================================
@@ -111,6 +106,7 @@ if __name__ == "__main__":
             ["tp", "Steve", "???"],
             ["tp", "Steve", "Alex", "100", "64", "2", "3", "4", "5", "6", "7", "8", "9"],
         ]
+
         class PlayerEntity:
             def __init__(self, name):
                 self.name = name
@@ -121,8 +117,9 @@ if __name__ == "__main__":
 
         player_dummy = PlayerEntity("dummy")
         for tokens in tests:
-            print("\n输入:", " ".join(tokens) or "(空)")
-            result = root.parse_command(tokens)
+            command = " ".join(tokens)
+            print("\n输入:", command or "(空)")
+            result = root.parse_command(command)
             print("预览:", result.suggest())
             result.execute(player_dummy)
 
@@ -134,7 +131,7 @@ if __name__ == "__main__":
         for tokens in tests:
             if not tokens:
                 continue
-            cmd = [tokens[-1]]
+            cmd = tokens[-1]
             print(f"\n输入: {cmd}")
             result2 = x.parse_command(cmd)
             print(result2.node.name)
