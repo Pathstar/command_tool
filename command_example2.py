@@ -1,8 +1,10 @@
-from command import CommandNode, ArgumentType, parse_command
+from command import CommandNode, ArgumentType, parse_command, ParseResult
 
 # Minecraft tp 示例 （只是演示，并非按照原tp命令实现）
 
 root = CommandNode("root")
+
+
 class PlayerArg(ArgumentType):
     def parse(self, token: str):
         if token.startswith("@") or token.isalpha():
@@ -27,6 +29,7 @@ def tp_executor(tokens, a_player):
     # player, target="", x=None, y=None
     # print(f"✅ TP 执行：{tokens[0]} → {} @ ({}, {})")
     print(f"✅ TP 执行 {tokens}, {a_player.__dict__}")
+    # raise Exception("模拟 TP 执行报错")
 
 
 # ==================================================
@@ -78,11 +81,17 @@ if __name__ == "__main__":
 
         print("\n\n------------------------------------------\n\n")
 
+        print(x.name)
         for tokens in tests:
             if not tokens:
                 continue
-            result = x.parse_command([tokens[-1]])
-            print("预览:", result.suggest())
-            result.execute(player_dummy)
+            cmd = [tokens[-1]]
+            print(f"\n输入: {cmd}")
+            result2: ParseResult = x.parse_command(cmd)
+            print("预览:", result2.suggest())
+            if result2.is_success:
+                result2.execute(player_dummy)
+            else:
+                print(f"❌ 报错： {result2.error}")
 
     demo()

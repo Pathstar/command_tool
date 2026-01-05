@@ -36,6 +36,8 @@ def tp_executor(tokens, player):
     # player, target="", x=None, y=None
     # print(f"✅ TP 执行：{tokens[0]} → {} @ ({}, {})")
     print(f"✅ TP 执行 {tokens}, {player.__dict__}")
+    # raise Exception("模拟 TP 执行报错")
+
 # 用 dict 描述命令树
 command_registry_dict = {
     "tp": {
@@ -75,10 +77,6 @@ command_registry_dict = {
 }
 
 build_registry(root, command_registry_dict)
-
-
-
-
 
 
 
@@ -126,7 +124,20 @@ if __name__ == "__main__":
             print("预览:", result.suggest())
             result.execute(player_dummy)
 
+        print("\n\n------------------------------------------\n\n")
 
+        #                                   player target x
+        x = root.get_child_node_by_tokens(["tp", 0, 0, 0])
+        print(x.name)
+        for tokens in tests:
+            if not tokens:
+                continue
+            cmd = [tokens[-1]]
+            print(f"\n输入: {cmd}")
+            result2 = x.parse_command(cmd)
+            print(result2.node.name)
+            print("预览:", result2.suggest())
+            result2.execute(player_dummy)
 
 
     demo()
