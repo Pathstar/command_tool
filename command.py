@@ -3,6 +3,7 @@
 NAME = "name"
 ALIASES = "aliases"
 ARG = "arg"
+REST = "rest"
 EXECUTOR = "executor"
 CHILDREN = "children"
 
@@ -79,6 +80,8 @@ class CommandNode:
         self.literal_children: dict[str, CommandNode] = {}
         self.argument_children: list[CommandNode] = []
 
+        self.consume_rest: bool = False
+
         self.executor: callable = None
 
     @property
@@ -101,6 +104,10 @@ class CommandNode:
         self.argument_children.append(node)
         return node
 
+
+    def parse_command(self, tokens: list[str]) -> ParseResult:
+        return parse_command(self, tokens)
+
     def remove_literal(self, node) -> int:
         to_del = [k for k, v in self.literal_children.items() if v is node]
         for k in to_del:
@@ -116,9 +123,6 @@ class CommandNode:
 
     def remove_literal_by_name(self, name: str) -> bool:
         return self.literal_children.pop(name, None) is not None
-
-    def parse_command(self, tokens: list[str]) -> ParseResult:
-        return parse_command(self, tokens)
 
     def get_literal_by_name(self, name: str, default=None):
         return self.literal_children.get(name, default)
@@ -161,10 +165,13 @@ def parse_command(root: CommandNode, tokens: list[str]) -> ParseResult:
     node = root
     args = []
 
-    for token in tokens:
+    for i, token in enumerate(tokens):
         # 1️⃣ literal 优先（O(1)）
         if token in node.literal_children:
             node = node.literal_children[token]
+            if node.consume_rest:
+                args.append(tokens[i+1:])
+                break
             continue
 
         # 2️⃣ argument 顺序匹配
@@ -175,12 +182,17 @@ def parse_command(root: CommandNode, tokens: list[str]) -> ParseResult:
                 args.append(value)
                 node = arg_node
                 matched = True
+                if node.consume_rest:
+                    args.append(tokens[i+1:])
                 break
             except ValueError:
                 continue
 
         if not matched:
             return ParseResult(node, args, error=f"无法解析参数: {token}")
+
+        if node.consume_rest:
+            break
 
     return ParseResult(node, args)
 
@@ -217,7 +229,9 @@ def build(parent, node_spec, command: list[str]=None):
 
     executor_func = node_spec.get(EXECUTOR, None)
     if executor_func:
-        node.executor = executor_func
+        cur.executor = executor_func
+
+    cur.consume_rest = node_spec.get(REST, False)
 
     for child in node_spec.get(CHILDREN, []):
         build(cur, child, command)

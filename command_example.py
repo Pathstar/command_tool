@@ -60,6 +60,7 @@ command_registry_dict = {
                                     {
                                         "name": "y",
                                         "arg": IntArg(),
+                                        "rest": True,
                                         "executor": tp_executor,
                                     }
                                 ]
@@ -108,6 +109,7 @@ if __name__ == "__main__":
             ["teleport", "Steve", "Alex", "100", "64"],
             ["tp_", "Steve", "Alex", "100", "64"],
             ["tp", "Steve", "???"],
+            ["tp", "Steve", "Alex", "100", "64", "2", "3", "4", "5", "6", "7", "8", "9"],
         ]
         class PlayerEntity:
             def __init__(self, name):

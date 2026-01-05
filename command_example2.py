@@ -43,6 +43,7 @@ player = tp.add_argument(CommandNode("player", PlayerArg()))
 target = player.add_argument(CommandNode("target", PlayerArg()))
 x = target.add_argument(CommandNode("x", IntArg()))
 y: CommandNode = x.add_argument(CommandNode("y", IntArg()))
+y.consume_rest = True
 y.executor = tp_executor
 player.executor = tp_executor
 
@@ -61,6 +62,7 @@ if __name__ == "__main__":
             ["teleport", "Steve", "Alex", "100", "64"],
             ["tp_", "Steve", "Alex", "100", "64"],
             ["tp", "Steve", "???"],
+            ["tp", "Steve", "Alex", "100", "64", "2", "3", "4", "5", "6", "7", "8", "9"],
         ]
         class PlayerEntity:
             def __init__(self, name):
