@@ -2,8 +2,6 @@ from typing import Callable
 
 NAME = "name"
 ARG = "arg"
-LITERAL = "literal"
-ARGUMENT = "argument"
 EXECUTOR = "executor"
 
 class ArgumentType:
@@ -12,6 +10,60 @@ class ArgumentType:
 
     def suggestions(self) -> list[str]:
         return []
+
+
+
+# ==================================================
+# Parse Result
+# ==================================================
+
+class ParseResult:
+    def __init__(self, node, args: list, error: str = None):
+        self.node = node
+        self.args = args
+        self.error = error
+
+    # ==================================================
+    # Suggestion
+    # ==================================================
+
+    def suggest(self, suggestions: list[str]=None) -> list[str]:
+        if self.error:
+            return []
+
+        if suggestions is None:
+            suggestions = []
+
+        node = self.node
+
+        # literal
+        suggestions.extend(node.literal_children.keys())
+
+        # argument
+        for arg in node.argument_children:
+            suggestions.extend(arg.arg_type.suggestions() or [f"<{arg.name}>"])
+
+        return suggestions
+
+
+    # ==================================================
+    # Executor
+    # ==================================================
+
+    def execute(self, *args, **kwargs):
+        if self.error:
+            print("❌ 错误：", self.error)
+            return
+
+        node = self.node
+        if node.executor:
+            try:
+                node.executor(self.args, *args, **kwargs)
+            except Exception as e:
+                print(f"❌ 执行executor错误: {e}")
+                print(node.__dict__)
+        else:
+            print("⚠️ 命令未完成，缺少参数")
 
 
 class CommandNode:
@@ -29,63 +81,42 @@ class CommandNode:
         return self.arg_type is not None
 
     def add_literal(self, node):
+        if node.name in self.literal_children:
+            # 已存在同名节点：复用已有节点，不用新建的 node
+            return self.literal_children[node.name]
         self.literal_children[node.name] = node
+        return node
+
+    def add_literal_aliases(self, names: list[str], node):
+        for n in names:
+            self.literal_children[n] = node
         return node
 
     def add_argument(self, node):
         self.argument_children.append(node)
         return node
 
+    def remove_literal(self, node) -> int:
+        to_del = [k for k, v in self.literal_children.items() if v is node]
+        for k in to_del:
+            del self.literal_children[k]
+        return len(to_del)
 
-# ==================================================
-# Parse Result
-# ==================================================
+    def remove_argument(self, node) -> bool:
+        for i, child in enumerate(self.argument_children):
+            if child is node:
+                self.argument_children.pop(i)
+                return True
+        return False
 
-class ParseResult:
-    def __init__(self, node: CommandNode, args: list, error: str = None):
-        self.node = node
-        self.args = args
-        self.error = error
-
-    # ==================================================
-    # Suggestion
-    # ==================================================
-
-    def suggest(self) -> list[str]:
-        if self.error:
-            return []
-
-        node = self.node
-        suggestions = []
-
-        # literal
-        suggestions.extend(node.literal_children.keys())
-
-        # argument
-        for arg in node.argument_children:
-            suggestions.extend(arg.arg_type.suggestions() or [f"<{arg.name}>"])
-
-        return suggestions
+    def remove_literal_by_name(self, name: str) -> bool:
+        return self.literal_children.pop(name, None) is not None
 
 
-    # ==================================================
-    # Executor
-    # ==================================================
+    def parse_command(self, tokens: list[str]) -> ParseResult:
+        return parse_command(self, tokens)
 
-    def execute(self):
-        if self.error:
-            print("❌ 错误：", self.error)
-            return
 
-        node = self.node
-        if node.executor:
-            try:
-                node.executor(self.args)
-            except Exception as e:
-                print(e)
-                print(node.__dict__)
-        else:
-            print("⚠️ 命令未完成，缺少参数")
 
 # ==================================================
 # Parser (遍历命令树，解析列表命令)
@@ -123,17 +154,26 @@ def parse_command(root: CommandNode, tokens: list[str]) -> ParseResult:
 def build(parent, node_spec, command=""):
     node_name = node_spec[NAME]
     command += f" {node_name}"
-    if node_spec["type"] == LITERAL:
-        node = CommandNode(node_name)
-        cur = parent.add_literal(node)
-    else:
+    if ARG in node_spec:
+        # --- argument ---
         arg = node_spec.get(ARG, None)
         if arg is None:
             print(f"Waring: argument {command} has no parse method")
+            # 保持原默认值
             node = CommandNode(node_name)
         else:
             node = CommandNode(node_name, arg)
         cur = parent.add_argument(node)
+    else:
+        # --- literal ---
+        node = CommandNode(node_name)
+        cur = parent.add_literal(node)
+        aliases = node_spec.get("aliases", None)
+        if aliases:
+            # add_literal 可能覆写对node有包装，使用cur
+            parent.add_literal_aliases(aliases, cur)
+        command += f" {node_name}"
+
 
     executor_func = node_spec.get(EXECUTOR, None)
     if executor_func:
@@ -146,6 +186,7 @@ def build(parent, node_spec, command=""):
 def build_registry(root, registry: dict):
     for cmd_name, spec in registry.items():
         build(root, spec)
+
 
 
 

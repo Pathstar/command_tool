@@ -23,9 +23,10 @@ class IntArg(ArgumentType):
 
 
 
-def tp_executor(args):
+def tp_executor(tokens, a_player):
     # player, target="", x=None, y=None
-    print(f"✅ TP 执行：{args[0]} → {args[1]} @ ({args[2]}, {args[3]})")
+    # print(f"✅ TP 执行：{tokens[0]} → {} @ ({}, {})")
+    print(f"✅ TP 执行 {tokens}, {a_player.__dict__}")
 
 
 # ==================================================
@@ -34,6 +35,7 @@ def tp_executor(args):
 # /tp <player> <target> <x> <y>
 
 tp = root.add_literal(CommandNode("tp"))
+root.add_literal_aliases(["teleport", "tpp", "tp_"], tp)
 player = tp.add_argument(CommandNode("player", PlayerArg()))
 target = player.add_argument(CommandNode("target", PlayerArg()))
 x = target.add_argument(CommandNode("x", IntArg()))
@@ -53,15 +55,34 @@ if __name__ == "__main__":
             ["tp", "Steve", "Alex"],
             ["tp", "Steve", "Alex", "100"],
             ["tp", "Steve", "Alex", "100", "64"],
+            ["teleport", "Steve", "Alex", "100", "64"],
+            ["tp_", "Steve", "Alex", "100", "64"],
             ["tp", "Steve", "???"],
         ]
+        class PlayerEntity:
+            def __init__(self, name):
+                self.name = name
+                self.obj_id = len(name)
+                self.pos = [0, 0, 0]
+                self.level = 1
+                self.game_mode = "Survival"
+
+        player_dummy = PlayerEntity("dummy")
 
         for tokens in tests:
+
             print("\n输入:", " ".join(tokens) or "(空)")
-            result = parse_command(root, tokens)
+            result = parse_command(root, tokens)  # or root.parse_command(tokens)
             print("预览:", result.suggest())
-            result.execute()
+            result.execute(player_dummy)
 
+        print("\n\n------------------------------------------\n\n")
 
+        for tokens in tests:
+            if not tokens:
+                continue
+            result = x.parse_command([tokens[-1]])
+            print("预览:", result.suggest())
+            result.execute(player_dummy)
 
     demo()

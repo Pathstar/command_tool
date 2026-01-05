@@ -3,6 +3,7 @@ from command import CommandNode, ArgumentType, build_registry, parse_command
 # Minecraft tp 示例 （只是演示，并非按照原tp命令实现）
 
 root = CommandNode("root")
+
 class PlayerArg(ArgumentType):
     def parse(self, token: str):
         if token.startswith("@") or token.isalpha():
@@ -31,37 +32,33 @@ class IntArg(ArgumentType):
 
 
 
-def tp_executor(args):
+def tp_executor(tokens, player):
     # player, target="", x=None, y=None
-    print(f"✅ TP 执行：{args[0]} → {args[1]} @ ({args[2]}, {args[3]})")
-
+    # print(f"✅ TP 执行：{tokens[0]} → {} @ ({}, {})")
+    print(f"✅ TP 执行 {tokens}, {player.__dict__}")
 # 用 dict 描述命令树
 command_registry_dict = {
     "tp": {
-        "type": "literal",
         "name": "tp",
+        "aliases": ["teleport", "tpp", "tp_"],
         "children": [
             {
-                "type": "argument",
                 "name": "player",
                 "arg": PlayerArg(),
                 "executor": tp_executor,
                 "children": [
                     {
-                        "type": "argument",
                         "name": "target",
                         "arg": PlayerArg(),
                         "children": [
                             {
-                                "type": "argument",
                                 "name": "x",
                                 "arg": IntArg(),
                                 "children": [
                                     {
-                                        "type": "argument",
                                         "name": "y",
                                         "arg": IntArg(),
-                                        "executor": tp_executor,  # ✅ 绑定在叶子节点
+                                        "executor": tp_executor,
                                     }
                                 ]
                             }
@@ -110,14 +107,25 @@ if __name__ == "__main__":
             ["tp", "Steve", "Alex"],
             ["tp", "Steve", "Alex", "100"],
             ["tp", "Steve", "Alex", "100", "64"],
+            ["teleport", "Steve", "Alex", "100", "64"],
+            ["tp_", "Steve", "Alex", "100", "64"],
             ["tp", "Steve", "???"],
         ]
+        class PlayerEntity:
+            def __init__(self, name):
+                self.name = name
+                self.obj_id = len(name)
+                self.pos = [0, 0, 0]
+                self.level = 1
+                self.game_mode = "Survival"
 
+        player_dummy = PlayerEntity("dummy")
         for tokens in tests:
             print("\n输入:", " ".join(tokens) or "(空)")
-            result = parse_command(root, tokens)
+            result = root.parse_command(tokens)
             print("预览:", result.suggest())
-            result.execute()
+            result.execute(player_dummy)
+
 
 
 
