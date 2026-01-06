@@ -29,10 +29,11 @@ class IntArg(ArgumentType):
 # /tp <player> <target> <x> <y>
 
 
-def tp_executor(tokens, player):
+def tp_executor(tokens, player, params=None, kwargs=None):
     # player, target="", x=None, y=None
     # print(f"✅ TP 执行：{tokens[0]} → {} @ ({}, {})")
     print(f"✅ TP 执行 {tokens}, {player.__dict__}")
+    print(f"params {params}, kwargs {kwargs}")
     # raise Exception("模拟 TP 执行报错")
 
 
@@ -41,6 +42,7 @@ command_registry_dict = {
     "tp": {
         "name": "tp",
         "aliases": ["teleport", "tpp", "tp_"],
+        "lowercase": True,  # 下一层是否使token小写匹配，默认True
         "children": [
             {
                 "name": "player",
@@ -60,6 +62,7 @@ command_registry_dict = {
                                         "arg": IntArg(),
                                         "rest": True,
                                         "executor": tp_executor,
+                                        "params": {"im_a_param": True}
                                     }
                                 ]
                             }
@@ -69,9 +72,19 @@ command_registry_dict = {
             }
         ],
     },
-    # "cmd2...": {
-    #
-    # }
+    "tp2": {
+        "name": "tp2",
+        "aliases": ["teleport2", "tpp2", "tp_2"],
+        "lowercase": True,  # 下一层是否使token小写匹配，默认True]
+        "executor": tp_executor,
+        "rest": True,
+        "children": [
+            {
+                "name": "-h",
+                "executor": tp_executor,
+            }
+        ]
+    }
 
 }
 
@@ -96,7 +109,10 @@ if __name__ == "__main__":
     def demo():
         tests = [
             [],
-            ["tp"],
+            ["Tpasdasdasd"],
+            ["Tp         "],
+            ["tp", "Player"],
+            ["Tp aasdasdasddas"],
             ["tp", "Steve"],
             ["tp", "Steve", "Alex"],
             ["tp", "Steve", "Alex", "100"],
@@ -105,6 +121,8 @@ if __name__ == "__main__":
             ["tp_", "Steve", "Alex", "100", "64"],
             ["tp", "Steve", "???"],
             ["tp", "Steve", "Alex", "100", "64", "2", "3", "4", "5", "6", "7", "8", "9"],
+            ["tp2", "aaaa", "aaa"],
+            ["tp2", "-h", "aaa"],
         ]
 
         class PlayerEntity:
@@ -121,7 +139,7 @@ if __name__ == "__main__":
             print("\n输入:", command or "(空)")
             result = root.parse_command(command)
             print("预览:", result.suggest())
-            result.execute(player_dummy)
+            result.execute(player_dummy, wtf_kwarg="wtf_value")
 
         print("\n\n------------------------------------------\n\n")
 
@@ -140,3 +158,17 @@ if __name__ == "__main__":
 
 
     demo()
+
+# "name": "tp",
+# "aliases": ["teleport", "tpp", "tp_"],
+# "lowercase": True,  # 下一层是否使token小写匹配，默认True
+# "executor": tp_executor,
+# "rest": False
+# > tp
+# 输入: Tp
+# 预览: []
+# ✅ TP 执行 [], {'name': 'dummy', 'obj_id': 5, 'pos': [0, 0, 0], 'level': 1, 'game_mode': 'Survival'}
+# params None, kwargs {'wtf_kwarg': 'wtf_value'}
+# tokens为空情况
+# 为此加入    if not args:
+#               args.append("")

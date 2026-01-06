@@ -5,6 +5,15 @@ ARG = "arg"
 REST = "rest"
 EXECUTOR = "executor"
 CHILDREN = "children"
+LOWERCASE = "lowercase"
+PARAMS = "params"
+
+LITERAL = "literal"
+ARGUMENT = "argument"
+
+DEFAULT_is_lowercase = True
+is_allow_rest = True
+sep = " "
 
 
 class ArgumentType:
@@ -20,7 +29,7 @@ class ArgumentType:
 # ==================================================
 
 class ParseResult:
-    def __init__(self, node, args: list, error: str = None):
+    def __init__(self, node, args: dict, error: str = None):
         self.node = node
         self.args = args
         self.error = error
@@ -28,6 +37,10 @@ class ParseResult:
     @property
     def is_success(self) -> bool:
         return self.error is None
+
+    @property
+    def is_incomplete(self) -> bool:
+        return not self.is_success and self.node.executor is None
 
     # ==================================================
     # Suggestion
@@ -63,7 +76,14 @@ class ParseResult:
         node = self.node
         if node.executor:
             try:
-                node.executor(self.args, *args, **kwargs)
+                params = node.params
+                call_kwargs = {}
+                if params:
+                    call_kwargs["params"] = params
+                if kwargs:
+                    call_kwargs["kwargs"] = kwargs
+                # 位置参数每个函数都要一致，关键词参数可统一写与不写
+                node.executor(self.args, *args, **call_kwargs)
             except Exception as e:
                 print(f"❌ 执行executor错误: {e}")
                 print(node.__dict__)
@@ -80,8 +100,10 @@ class CommandNode:
         self.argument_children: list[CommandNode] = []
 
         self.consume_rest: bool = False
+        self.is_lowercase: bool = DEFAULT_is_lowercase
 
         self.executor: callable = None
+        self.params: dict = {}
 
     @property
     def is_argument(self) -> bool:
@@ -105,6 +127,24 @@ class CommandNode:
 
     def parse_command(self, command_str: str) -> ParseResult:
         return parse_command(self, command_str)
+
+    def parse_and_execute(self, command_str: str, *args, **kwargs) -> bool:
+        """
+        :param command_str:
+        :param args:
+        :param kwargs:
+        :return: is success execute
+        """
+        result: ParseResult = self.parse_command(command_str)
+        # print("预览:", result.suggest())
+        if result.is_success:
+            result.execute(*args, **kwargs)
+            return True
+        else:
+            return False
+
+    def build_registry(self, registry: dict):
+        build_registry(self, registry)
 
     def remove_literal(self, node) -> int:
         to_del = [k for k, v in self.literal_children.items() if v is node]
@@ -160,58 +200,68 @@ class CommandNode:
 # Parser (遍历命令树，解析列表命令)
 # ==================================================
 
-def next_token(s: str, sep: str = " "):
+def next_token(s: str, sep_: str = sep):
     """
     从 s 中取出下一个 token 和 rest（剩余字符串）。
     - 自动跳过开头连续分隔符
-    - sep 为单个分隔符字符串（如 " "、","、"|" 等）
+    - sep_ 为单个分隔符字符串（如 " "、","、"|" 等）
     """
-    if not sep:
+    if not sep_:
         raise ValueError("sep 不能为空")
-    s = s.lstrip(sep)
+    s = s.lstrip(sep_)
     if not s:
-        return None, ""
-    idx = s.find(sep)
+        return None, None
+    idx = s.find(sep_)
     if idx == -1:
         return s, ""
-    return s[:idx], s[idx + len(sep):]
+    return s[:idx], s[idx + len(sep_):]
 
 
-def parse_command(root: CommandNode, command_str: str, sep: str = " ") -> ParseResult:
+def parse_command(root: CommandNode, command_str: str, sep_: str = sep) -> ParseResult:
     node = root
-    args = []
+    args = {
+        LITERAL: [],
+        ARGUMENT: [],
+    }
 
     rest = command_str
     while True:
-        token, rest = next_token(rest, sep)
-        if token is None:  # 没有更多 token
+        token, rest = next_token(rest, sep_)
+        if token is None:
             break
-        # 1️⃣ literal 优先（O(1)）
+
+        if node.is_lowercase:
+            token = token.lower()
+
+        # 1️⃣ literal 优先
         if token in node.literal_children:
             node = node.literal_children[token]
-            if node.consume_rest:
-                args.append(rest)
-                break
+            args[LITERAL].append(token)
             continue
 
         # 2️⃣ argument 顺序匹配
         matched = False
-        for arg_node in node.argument_children:
+        for node_arg in node.argument_children:
             try:
-                value = arg_node.arg_type.parse(token)
-                args.append(value)
-                node = arg_node
+                value = node_arg.arg_type.parse(token)
+                args[ARGUMENT].append(value)
+                node = node_arg
                 matched = True
-                if node.consume_rest:
-                    args.append(rest)
                 break
             except ValueError:
                 continue
+            except Exception as e:
+                print(f"{node_arg.name} parse argument error: {e}")
 
         if not matched:
+            # 如果当前节点设置了 consume_rest，说明这个 token 应该被吞掉
+            if node.consume_rest:
+                args[REST] = f"{token}{sep_}{rest}" if rest else token
+                break
             return ParseResult(node, args, error=f"无法解析参数: {token}")
 
-        if node.consume_rest:
+        # 如果 consume_rest 为 True，但我们成功匹配了当前 token，就继续循环
+        if node.consume_rest and not rest:
             break
 
     return ParseResult(node, args)
@@ -251,10 +301,17 @@ def build(parent, node_spec, command: list[str] = None):
     if executor_func:
         cur.executor = executor_func
 
-    cur.consume_rest = node_spec.get(REST, False)
+    cur.is_lowercase = node_spec.get(LOWERCASE, DEFAULT_is_lowercase)
+    cur.params = node_spec.get(PARAMS, {})
 
-    for child in node_spec.get(CHILDREN, []):
-        build(cur, child, command)
+    children = node_spec.get(CHILDREN, None)
+    if children:
+        cur.consume_rest = node_spec.get(REST, False)
+        for child in node_spec.get(CHILDREN, []):
+            build(cur, child, command)
+    else:
+        cur.consume_rest = node_spec.get(REST, is_allow_rest)
+
     return cur
 
 
